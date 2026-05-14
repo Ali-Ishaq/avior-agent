@@ -1,0 +1,3 @@
+# Avior Agent
+
+Avior is an AI-powered personal assistant connected to WhatsApp that automates your daily tasks through natural conversation. Integrated with WhatsApp's Official Cloud API, Avior uses Google Gemini as the underlying intelligence layer to understand your requests and execute actions like scheduling Google Meets, adding events to your calendar, composing emails, and more—all through WhatsApp's familiar interface. The agent combines LangGraph for agentic workflows, Express.js for webhook handling, and integrations with Google services to transform WhatsApp into a productivity powerhouse.
