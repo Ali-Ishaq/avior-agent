@@ -1,4 +1,4 @@
-import { chain } from "../ai/index.js";
+import { agent, config } from "../ai/index.js";
 import { sendMessage } from "../services/index.js";
 
 export const handleWhatsAppWebhookVerify = (req, res) => {
@@ -22,8 +22,11 @@ export const handleWhatsAppWebhookMessage = async (req, res) => {
     text: { body: message },
   } = req.body.entry[0].changes[0].value.messages[0];
 
-  const AiResponse = await chain.invoke({
-    question: message,
-  });
-  await sendMessage(from, AiResponse, messageId);
+  const AiResponse = await agent.invoke(
+    {
+      messages: [new HumanMessage(message)],
+    },
+    config,
+  );
+  await sendMessage(from, AiResponse.messages.at(-1).content, messageId);
 };
