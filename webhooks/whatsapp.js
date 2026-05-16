@@ -1,3 +1,4 @@
+import { HumanMessage } from "@langchain/core/messages";
 import { agent, config } from "../ai/index.js";
 import { sendMessage } from "../services/index.js";
 
