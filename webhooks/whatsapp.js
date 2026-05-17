@@ -1,5 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
-import { agent, config } from "../ai/index.js";
+import { agent, getConfig } from "../agent/index.js";
 import { sendMessage } from "../services/index.js";
 
 export const handleWhatsAppWebhookVerify = (req, res) => {
@@ -14,7 +14,8 @@ export const handleWhatsAppWebhookVerify = (req, res) => {
 export const handleWhatsAppWebhookMessage = async (req, res) => {
   console.log(
     "Received webhook message:",
-    req.body.entry[0].changes[0].value.messages[0],
+    req.body.entry[0]?.changes[0]?.value.messages[0]?.text?.body ||
+      "No message text found",
   );
   res.status(200).send("Message received");
   const {
@@ -23,11 +24,16 @@ export const handleWhatsAppWebhookMessage = async (req, res) => {
     text: { body: message },
   } = req.body.entry[0].changes[0].value.messages[0];
 
+  const config = getConfig(from);
   const AiResponse = await agent.invoke(
     {
       messages: [new HumanMessage(message)],
     },
     config,
+  );
+  console.log(
+    "Workflow State:",
+    AiResponse.messages || "No content in AI response",
   );
   await sendMessage(from, AiResponse.messages.at(-1).content, messageId);
 };
