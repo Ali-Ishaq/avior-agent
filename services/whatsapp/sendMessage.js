@@ -7,7 +7,6 @@ const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const API_URL = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
 
-// Send a text message
 export const sendMessage = async (to, text, messageId) => {
   try {
     console.log("Sending message:", { to, text, messageId });
