@@ -5,6 +5,7 @@ import {
   handleWhatsAppWebhookVerify,
   handleWhatsAppWebhookMessage,
 } from "./webhooks/index.js";
+import { authRouter } from "./routes/auth.js";
 
 dotenv.config();
 
@@ -18,7 +19,5 @@ app.get("/", (req, res) => {
   res.send("Hello from Avior Agent!");
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running locally at http://localhost:${PORT}`);
-});
+app.use("/auth", authRouter);
+
