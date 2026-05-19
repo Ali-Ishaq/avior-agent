@@ -14,7 +14,10 @@ import { z } from "zod";
 import { TavilySearch } from "@langchain/tavily";
 import { MemorySaver } from "@langchain/langgraph";
 import { isTokenExpired } from "../services/google/isTokenExpired.js";
-import { oauth2Client } from "../services/google/generateAuthUrl.js";
+import {
+  oauth2Client,
+  generateAuthUrl,
+} from "../services/google/generateAuthUrl.js";
 import { UserToken } from "../model/userToken.js";
 
 const websearch = new TavilySearch({
@@ -29,7 +32,10 @@ const gmailTool = tool(
     if (!phone) return "No phone number found in config.";
 
     const userTokenDoc = await UserToken.findOne({ phoneNumber: phone });
-    if (!userTokenDoc) return `No token document found for: ${phone}`;
+    if (!userTokenDoc) {
+      const authUrl = generateAuthUrl(phone);
+      return `AUTH_REQUIRED: ${authUrl}`;
+    }
 
     let tokens = userTokenDoc.google;
     if (!tokens?.accessToken) return `No access token found for: ${phone}`;
@@ -45,7 +51,7 @@ const gmailTool = tool(
           {
             google: {
               accessToken: credentials.access_token,
-              refreshToken: tokens.refreshToken,
+              refreshToken: credentials.refresh_token || tokens.refreshToken, // keep old refresh token if new one isn't provided
               expiryDate: credentials.expiry_date,
             },
           },
