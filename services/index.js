@@ -1,1 +1,1 @@
-export {sendMessage} from "./whatsapp/sendMessage.js";
+export { sendMessage } from "./whatsapp/sendMessage.js";

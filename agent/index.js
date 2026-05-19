@@ -1,9 +1,9 @@
-import dotenv from "dotenv";
-dotenv.config();
+import "../config/loadEnv.js";
 
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { MessagesAnnotation, StateGraph } from "@langchain/langgraph";
 import {
+  AIMessage,
   HumanMessage,
   SystemMessage,
   trimMessages,
@@ -19,6 +19,8 @@ import {
   generateAuthUrl,
 } from "../services/google/generateAuthUrl.js";
 import { UserToken } from "../model/userToken.js";
+import { MongoDBSaver } from "@langchain/langgraph-checkpoint-mongodb";
+import { MongoClient } from "mongodb";
 
 const websearch = new TavilySearch({
   maxResults: 3,
@@ -114,57 +116,86 @@ const gmailTool = tool(
 
 const tools = [websearch, gmailTool];
 const toolNode = new ToolNode(tools);
-const memory = new MemorySaver();
+
+const client = new MongoClient(process.env.MONGO_URI);
+const checkpointer = new MongoDBSaver({ client: client });
 
 export const getConfig = (phoneNumber) => ({
   configurable: { thread_id: phoneNumber, phoneNumber },
 });
 
 const SYSTEM_PROMPT = `
-You are a smart personal assistant. You help users get things done using the tools available to you.
+You are a smart personal assistant that helps users get things done.
 
-CURRENT TOOLS:
-- send_gmail  → send emails on behalf of the user
-- web_search  → search the web for real-time or factual information
+AVAILABLE TOOLS:
+- send_gmail  → send an email on the user's behalf
+- web_search  → look up real-time or factual information
 
 GENERAL RULES:
 - Use tools only when necessary — answer from knowledge if you already know.
 - Use web_search when the task involves current, real-time, or uncertain information.
 - Ask for ONE missing detail at a time. Never overwhelm the user.
 
-EMAIL WORKFLOW — follow these steps IN ORDER, never skip any:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EMAIL RULES — READ CAREFULLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  STEP 1 — COLLECT REQUIRED INFO
-    - Recipient's full email address → if missing, ask for it
-    - Never guess or assume an email address
+RULE 1 — NEVER send without showing a preview first.
+  You must ALWAYS show the email preview and ask "Shall I send this?" before
+  calling send_gmail. No exceptions. Even if the user gives you every detail
+  upfront, you still show the preview first.
 
-  STEP 2 — RESOLVE SENDER IDENTITY
-    - If the email body would need a sender name or signature → ask: "What name should I sign the email with?"
-    - Never leave placeholders like [Your Name] in the email
+RULE 2 — NEVER call send_gmail without the user saying yes.
+  Only send after the user explicitly confirms with something like:
+  "yes", "send it", "go ahead", "looks good".
+  A send request is NOT confirmation — it is a request to draft and preview.
 
-  STEP 4 — DRAFT & SHOW PREVIEW
-    - Write a complete, professional email with no placeholders
-    - Always show the preview in this exact format:
+RULE 3 — Fill in missing details yourself. Don't ask unnecessarily.
+  - No subject? → Invent a short, professional one.
+  - No recipient name? → Use "Hello," or "Dear Sir/Madam,".
+  - Only ask if something is truly impossible to infer or invent.
+  - Never use an email address as a greeting (e.g. never "Dear ali@gmail.com").
 
-        📧 To      : <email>
-        📌 Subject : <subject>
+RULE 4 — Always respond with text after a tool call. Never return empty.
+  - If send_gmail succeeds → "✅ Your email has been sent successfully."
+  - If send_gmail returns an auth URL → show this message exactly:
+      "📬 You need to connect your Gmail account before I can send emails.
+       👉 [Authorize Gmail](<url>)
+       Once you've authorized, just let me know and I'll send it right away."
+  - Any other error → explain it plainly and ask if the user wants to retry.
 
-        <full email body>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EMAIL PREVIEW FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        ─────────────────
-        Shall I send this?
+Always show the preview exactly like this before sending:
 
-  STEP 5 — WAIT FOR CONFIRMATION
-    - STOP and wait for user response after showing the preview — this is a hard rule 
-    - ONLY proceed to send if user says yes / send it / go ahead / looks good
-    - If user requests changes → revise and show preview again
-    - NEVER call send_gmail without explicit confirmation — this is a hard rule
+  📧 To      : <email>
+  📌 Subject : <subject>
 
-  STEP 6 — SEND & CONFIRM
-    - Call send_gmail with the final confirmed email
-    - After the tool returns success, always respond with a friendly confirmation:
-      Example: "✅ Done! Your email to Ali has been sent successfully."
-    - Never return an empty response after a tool call
+  <full email body>
+
+  ─────────────────
+  Shall I send this?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User: "send an email to x@y.com about Z, choose subject, sign as Bob"
+✅ Draft email → show preview → ask "Shall I send this?" → wait
+❌ Call send_gmail immediately
+❌ Ask for the subject
+
+User: "yes" (after seeing preview)
+✅ Call send_gmail → confirm success
+❌ Show the preview again
+❌ Ask for more confirmation
+
+User: "send it to john@x.com" (no subject, no name, no body details)
+✅ Invent subject, write body, use "Hello," as greeting → show preview
+❌ Ask "What subject should I use?"
+❌ Ask "What name should I sign with?"
 `;
 
 const model = new ChatGoogleGenerativeAI({
@@ -190,7 +221,7 @@ const agentNode = async (state) => {
   } catch (error) {
     console.error("Agent node error:", error.message);
     const response = "❌ Oops, something went wrong. Please try again.";
-    return { messages: [new HumanMessage(response)] };
+    return { messages: [new AIMessage(response)] };
   }
 
   return { messages: [response] };
@@ -208,4 +239,4 @@ const workflow = new StateGraph(MessagesAnnotation)
   .addConditionalEdges("agent", shouldUseTool)
   .addEdge("tools", "agent");
 
-export const agent = workflow.compile({ checkpointer: memory });
+export const agent = workflow.compile({ checkpointer });

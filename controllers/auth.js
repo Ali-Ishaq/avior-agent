@@ -1,3 +1,4 @@
+import "../config/loadEnv.js";
 import { sendMessage } from "../services/index.js";
 import { oauth2Client } from "../services/google/generateAuthUrl.js";
 import { UserToken } from "../model/userToken.js";
@@ -16,10 +17,16 @@ export const googleAuthHandler = async (req, res) => {
   try {
     const { tokens: rawTokens } = await oauth2Client.getToken(code);
 
-    const userTokens =await UserToken.findOneAndUpdate(
+    const googleTokens = {
+      accessToken: rawTokens.access_token,
+      refreshToken: rawTokens.refresh_token,
+      expiryDate: rawTokens.expiry_date,
+    };
+
+    const userTokens = await UserToken.findOneAndUpdate(
       { phoneNumber },
-      { google: rawTokens },
-      { new: true }
+      { google: googleTokens },
+      { upsert: true, returnDocument: "after" },
     );
     // tokens.save(phoneNumber, rawTokens);
     console.log("Stored tokens for", phoneNumber, userTokens.google);

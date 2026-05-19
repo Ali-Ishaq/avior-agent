@@ -13,9 +13,6 @@ export const connectDB = async () => {
   });
 };
 
-export const getMongoClient = () => {
-  return mongoose.connection.getClient();
-};
 
 export const closeDB = async () => {
   await mongoose.connection.close();
