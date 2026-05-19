@@ -1,6 +1,7 @@
 import { HumanMessage } from "@langchain/core/messages";
 import { agent, getConfig } from "../agent/index.js";
 import { sendMessage } from "../services/index.js";
+import {handleEmptyAgentResponse} from "../utils/handleEmptyAgentResponse.js";
 
 export const handleWhatsAppWebhookVerify = (req, res) => {
   const { hub_mode, hub_verify_token, hub_challenge } = req.query;
@@ -25,15 +26,19 @@ export const handleWhatsAppWebhookMessage = async (req, res) => {
   } = req.body.entry[0].changes[0].value.messages[0];
 
   const config = getConfig(from);
-  const AiResponse = await agent.invoke(
+  let agentResponse = await agent.invoke(
     {
       messages: [new HumanMessage(message)],
     },
     config,
   );
   console.log(
-    "Workflow State:",
-    AiResponse.messages || "No content in AI response",
+    "Agent Response:",
+    agentResponse.messages || "No content in AI response",
   );
-  await sendMessage(from, AiResponse.messages.at(-1).content, messageId);
+
+  if (agentResponse.messages.at(-1).content.length <= 0) {
+    agentResponse = await handleEmptyAgentResponse(agent, agentResponse, config);
+  }
+  await sendMessage(from, agentResponse.messages.at(-1).content, messageId);
 };
