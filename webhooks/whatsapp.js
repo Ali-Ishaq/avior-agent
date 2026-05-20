@@ -34,7 +34,7 @@ export const handleWhatsAppWebhookMessage = async (req, res) => {
   );
   console.log(
     "Agent Response:",
-    agentResponse.messages || "No content in AI response",
+    agentResponse.messages.slice(-10) || "No content in AI response",
   );
 
   if (agentResponse.messages.at(-1).content.length <= 0) {
