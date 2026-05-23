@@ -10,7 +10,10 @@ export function generateAuthUrl(phoneNumber) {
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
-    scope: ["https://www.googleapis.com/auth/gmail.send"],
+    scope: [
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/calendar",
+    ],
     state: phoneNumber, // returned as-is in callback
   });
 }
