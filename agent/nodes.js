@@ -30,6 +30,7 @@ export const agentNode = async (state) => {
     strategy: "last",
     tokenCounter: (msgs) => msgs.length, // count messages, not tokens
     includeSystem: false,
+    startOn:"human", 
   });
 
   // Remove error messages from history so they don't confuse the model
