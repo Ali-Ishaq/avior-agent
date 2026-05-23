@@ -7,7 +7,7 @@ import {
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 
 import { tools } from "./tools.js";
-import { SYSTEM_PROMPT } from "./systemPrompt.js";
+import { getSystemPrompt } from "./systemPrompt.js";
 
 const model = new ChatGoogleGenerativeAI({
   model: "gemini-3-flash-preview",
@@ -45,7 +45,7 @@ export const agentNode = async (state) => {
 
   try {
     const response = await model.invoke([
-      new SystemMessage(SYSTEM_PROMPT),
+      new SystemMessage(getSystemPrompt()),
       ...trimmed,
     ]);
 
