@@ -309,6 +309,7 @@ export const checkAvailability = tool(
       });
 
       const busySlots = response.data.calendars.primary.busy; // [{ start, end }, ...]
+      console.log("Busy slots:", busySlots);
 
       if (busySlots.length === 0) {
         return ok("check_availability", {
@@ -387,6 +388,90 @@ export const checkAvailability = tool(
   },
 );
 
+const getSchedule = tool(
+  async ({ timeMin, timeMax, timeZone }, config) => {
+    const phone = config?.configurable?.phoneNumber;
+    if (!phone) return fail("get_schedule", "No phone number found in config.");
+
+    const tokenResult = await getAccessToken(phone);
+    if (tokenResult.status === "failed")
+      return fail("get_schedule", tokenResult.message);
+
+    const { accessToken, refreshToken } = tokenResult.tokens;
+    const auth = oauth2Client;
+    auth.setCredentials({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    const calendar = google.calendar({ version: "v3", auth });
+
+    try {
+      const response = await calendar.events.list({
+        calendarId: "primary",
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: "startTime",
+      });
+
+      const events = response.data.items;
+
+      if (events.length === 0) {
+        return ok("get_schedule", {
+          timeMin,
+          timeMax,
+          timeZone,
+          events: [],
+          message: `No events found between ${timeMin} and ${timeMax}.`,
+        });
+      }
+
+      return ok("get_schedule", {
+        timeMin,
+        timeMax,
+        timeZone,
+        events: events.map((event) => ({
+          title: event.summary,
+          start: event.start.dateTime || event.start.date,
+          end: event.end.dateTime || event.end.date,
+          meetLink: event.hangoutLink ?? null,
+          attendees: event.attendees?.map((a) => a.email) ?? [],
+          location: event.location ?? null,
+        })),
+        message: `Found ${events.length} event(s) in the requested window.`,
+      });
+    } catch (error) {
+      return fail("get_schedule", error.message);
+    }
+  },
+  {
+    name: "get_schedule",
+    description: `Retrieves the user's Google Calendar schedule in a given time window.
+      Use when the user says things like:
+      - "What's my schedule on Friday?"
+      - "Show me my events this week?"
+      - "List my meetings for today"
+      - "What do I have scheduled for tomorrow?"
+      timeMin and timeMax must be ISO 8601 strings in UTC (e.g. "2026-06-01T08:00:00Z").`,
+    schema: z.object({
+      timeMin: z
+        .string()
+        .describe(
+          "Start of the window to check in ISO 8601 UTC format e.g. 2026-06-01T08:00:00Z",
+        ),
+      timeMax: z
+        .string()
+        .describe(
+          "End of the window to check in ISO 8601 UTC format e.g. 2026-06-01T17:00:00Z",
+        ),
+      timeZone: z
+        .string()
+        .default("Asia/Karachi")
+        .describe("IANA timezone string used to interpret and display times"),
+    }),
+  },
+);
+
 const getAccessToken = async (phone) => {
   const userTokenDoc = await UserToken.findOne({ phoneNumber: phone });
   if (!userTokenDoc) {
@@ -439,5 +524,6 @@ export const tools = [
   gmailTool,
   addCalendarEvent,
   checkAvailability,
+  getSchedule,
   scheduleMeet,
 ];
