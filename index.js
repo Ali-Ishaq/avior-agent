@@ -8,6 +8,7 @@ import {
 import { authRouter } from "./routes/auth.js";
 
 import { connectDB } from "./config/db.js";
+import {startCronRunner} from "./agent/cronRunner.js";
 
 const app = express();
 app.use(express.json());
@@ -24,6 +25,8 @@ app.use("/auth", authRouter);
 const startServer = async () => {
   try {
     await connectDB(); // wait for DB before doing anything
+    await startCronRunner(); // start cron runner after DB is connected
+    
 
     const server = app.listen(process.env.PORT || 3000, () => {
       console.log(`Server running on port ${process.env.PORT || 3000}`);

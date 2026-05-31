@@ -25,7 +25,7 @@ export const handleWhatsAppWebhookMessage = async (req, res) => {
     text: { body: message },
   } = req.body.entry[0].changes[0].value.messages[0];
 
-  const config = getConfig(from);
+  const config = getConfig({ thread_id: messageId, phoneNumber: from, waMessageId: messageId });
   let agentResponse = await agent.invoke(
     {
       messages: [new HumanMessage(message)],

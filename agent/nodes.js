@@ -19,7 +19,7 @@ const model = new ChatGoogleGenerativeAI({
 
 export const toolNode = new ToolNode(tools);
 
-export const agentNode = async (state) => {
+export const agentNode = async (state,config) => {
   // const trimmed = await trimMessages(state.messages, {
   //   maxTokens: 5000,
   //   strategy: "last",
@@ -43,9 +43,14 @@ export const agentNode = async (state) => {
       ),
   );
 
+
   try {
+
+    const systemPrompt = config?.configurable?.type === "automated"
+      ? getSystemPrompt({ type: "automated" })
+      : getSystemPrompt();
     const response = await model.invoke([
-      new SystemMessage(getSystemPrompt()),
+      new SystemMessage(systemPrompt),
       ...trimmed,
     ]);
 
