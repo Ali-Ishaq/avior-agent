@@ -9,6 +9,7 @@ import {
   generateAuthUrl,
 } from "../services/google/generateAuthUrl.js";
 import { UserToken } from "../model/userToken.js";
+import { ScheduledJob } from "../model/scheduledJob.js";
 
 const ok = (tool, data) => JSON.stringify({ status: "success", tool, ...data });
 
@@ -519,6 +520,208 @@ const getAccessToken = async (phone) => {
   };
 };
 
+export const createAutomatedTask = tool(
+  async ({ task, type, scheduledAt, cronExpr }, config) => {
+    const phone = config?.configurable?.phoneNumber;
+    const waMessageId = config?.configurable?.waMessageId;
+    if (!phone)
+      return fail("create_automated_task", "No phone number found in config.");
+
+    // Validate: one-time must have scheduledAt
+    if (type === "once" && !scheduledAt) {
+      return fail(
+        "create_automated_task",
+        "scheduledAt is required for one-time automated tasks.",
+        "Ask the user for the exact date and time for the task.",
+      );
+    }
+
+    // Validate: recurring must have cronExpr
+    if (type === "recurring" && !cronExpr) {
+      return fail(
+        "create_automated_task",
+        "cronExpr is required for recurring automated tasks.",
+        "Ask the user for the frequency e.g. daily at noon, every Monday at 9am.",
+      );
+    }
+
+    // Validate: one-time automated tasks must be in the future
+    if (type === "once" && new Date(scheduledAt) < new Date()) {
+      return fail(
+        "create_automated_task",
+        `Scheduled time (${scheduledAt}) is in the past.`,
+        "Ask the user to confirm the correct future date and time.",
+      );
+    }
+
+    try {
+      const reminder = await ScheduledJob.create({
+        phoneNumber: phone,
+        waMessageId: waMessageId ?? null,
+        task,
+        type,
+        scheduledAt: scheduledAt ?? null,
+        cronExpr: cronExpr ?? null,
+        status: "pending",
+      });
+
+      return ok("create_automated_task", {
+        reminderId: reminder._id,
+        task,
+        type,
+        scheduledAt: scheduledAt ?? null,
+        cronExpr: cronExpr ?? null,
+        summary:
+          type === "once"
+            ? `Automated task set for ${scheduledAt}. I'll take care of it then.`
+            : `Recurring automated task set (${cronExpr}). I'll handle it automatically.`,
+      });
+    } catch (error) {
+      return fail("create_automated_task", error.message);
+    }
+  },
+  {
+    name: "create_automated_task",
+    description: `Schedules a one-time or recurring task for the agent to execute automatically at the given time.
+      The agent will invoke itself at the scheduled time and carry out the task using its available tools.The task will be passed as a direct instruction to the agent.
+      Write it as a command the agent should act on, not a conversational response.
+ 
+      Use for things like:
+      - "Remind me to pick Ali in 20 minutes" → one-time, task: "Send me a response message: time to pick Ali"
+      - "Email me the weather every morning at 8am" → recurring, task: "Search today's weather in Karachi and email it to me"
+      - "Remind me to send the report on Friday at 5pm" → one-time, task: "Send me a response message: don't forget to send the report"
+ 
+      CRITICAL — TASK COMPLETENESS:
+      Before calling this tool, mentally simulate running the task with zero user input.
+      The task field must contain every piece of information needed to complete it.
+
+      Go through each tool the task will need and ensure all its required fields are embedded:
+
+      If ANY required detail is missing — ask the user for it BEFORE calling this tool.
+      Never call this tool with a vague or incomplete task.
+      - Never guess or infer a cronExpr — always confirm the exact schedule with the user first.
+      - scheduledAt must be in ISO 8601 UTC format.`,
+    schema: z.object({
+      task: z
+        .string()
+        .describe(
+          "Full self-contained instruction for the agent to execute at the scheduled time. Must not require any user input to carry out.",
+        ),
+      type: z
+        .enum(["once", "recurring"])
+        .describe(
+          "once for a single future task, recurring for a repeating schedule",
+        ),
+      scheduledAt: z
+        .string()
+        .optional()
+        .describe(
+          "Required for one-time reminders. ISO 8601 UTC e.g. 2026-06-01T07:00:00Z",
+        ),
+      cronExpr: z
+        .string()
+        .optional()
+        .describe(
+          "Required for recurring reminders. Standard 5-field cron expression e.g. '0 12 * * *' for daily at noon, '0 9 * * 1' for every Monday at 9am",
+        ),
+    }),
+  },
+);
+
+export const cancelAutomatedTask = tool(
+  async ({ reminderId }, config) => {
+    const phone = config?.configurable?.phoneNumber;
+    if (!phone)
+      return fail("cancel_automated_task", "No phone number found in config.");
+
+    try {
+      const reminder = await ScheduledJob.findOneAndUpdate(
+        { _id: reminderId, phoneNumber: phone, status: "pending" },
+        { status: "cancelled" },
+        { new: true },
+      );
+
+      if (!reminder) {
+        return fail(
+          "cancel_automated_task",
+          "No active automated task found with that ID.",
+          "Use list_automated_tasks to show the user their active automated tasks and get the correct ID.",
+        );
+      }
+
+      return ok("cancel_automated_task", {
+        reminderId,
+        task: reminder.task,
+        message: `Automated task cancelled successfully.`,
+      });
+    } catch (error) {
+      return fail("cancel_automated_task", error.message);
+    }
+  },
+  {
+    name: "cancel_automated_task",
+    description: `Cancels an active automated task by its ID.
+      Use when the user says things like:
+      - "Cancel my noon joke automated task"
+      - "Remove the Ali pickup automated task"
+      If you don't have the reminderId, call list_automated_tasks first to show the user their active automated tasks.`,
+    schema: z.object({
+      reminderId: z
+        .string()
+        .describe(
+          "The _id of the automated task to cancel. Get this from list_automated_tasks if unknown.",
+        ),
+    }),
+  },
+);
+
+export const listAutomatedTask = tool(
+  async (_args, config) => {
+    const phone = config?.configurable?.phoneNumber;
+    if (!phone)
+      return fail("list_automated_tasks", "No phone number found in config.");
+
+    try {
+      const reminders = await ScheduledJob.find({
+        phoneNumber: phone,
+        status: "pending",
+      }).sort({ createdAt: -1 });
+
+      if (reminders.length === 0) {
+        return ok("list_automated_tasks", {
+          reminders: [],
+          message: "You have no active automated tasks.",
+        });
+      }
+
+      return ok("list_automated_tasks", {
+        count: reminders.length,
+        reminders: reminders.map((r) => ({
+          reminderId: r._id,
+          task: r.task,
+          type: r.type,
+          scheduledAt: r.scheduledAt ?? null,
+          cronExpr: r.cronExpr ?? null,
+        })),
+        message: `You have ${reminders.length} active automated task(s).`,
+      });
+    } catch (error) {
+      return fail("list_automated_tasks", error.message);
+    }
+  },
+  {
+    name: "list_automated_tasks",
+    description: `Lists all active (pending) automated tasks for the user.
+      ONLY call this when the user says something very close to:
+  - "List automated tasks"
+  - "Show automated tasks"
+  - "What automated tasks do I have?"
+  
+  Do not call this for anything else.`,
+    schema: z.object({}),
+  },
+);
+
 export const tools = [
   websearch,
   gmailTool,
@@ -526,4 +729,7 @@ export const tools = [
   checkAvailability,
   getSchedule,
   scheduleMeet,
+  createAutomatedTask,
+  cancelAutomatedTask,
+  listAutomatedTask,
 ];
