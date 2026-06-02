@@ -35,7 +35,11 @@ const runTask = async (reminder) => {
       "Agent response for scheduled task:",
       response.messages.slice(-4),
     );
-    await sendMessage(reminder.phoneNumber, response.messages.at(-1).content);
+    await sendMessage(
+      reminder.phoneNumber,
+      response.messages.at(-1).content,
+      reminder.waMessageId,
+    );
 
     log("DONE", `Task completed for ${reminder.phoneNumber}`);
   } catch (error) {
@@ -57,7 +61,7 @@ cron.schedule("* * * * *", async () => {
     });
 
     log("POLL", `Checked for due one-time tasks at ${now.toISOString()}`);
-    
+
     if (dueTasks.length === 0) return;
 
     log("POLL", `Found ${dueTasks.length} due one-time task(s)`);
