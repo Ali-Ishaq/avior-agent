@@ -17,8 +17,13 @@ const runTask = async (reminder) => {
       `Executing task for ${reminder.phoneNumber}: "${reminder.task}"`,
     );
 
-    const config = getConfig({thread_id: reminder._id.toString(), phoneNumber: reminder.phoneNumber, waMessageId: reminder.waMessageId, type: "automated"});
-    
+    const config = getConfig({
+      thread_id: reminder._id.toString(),
+      phoneNumber: reminder.phoneNumber,
+      waMessageId: reminder.waMessageId,
+      type: "automated",
+    });
+
     const response = await agent.invoke(
       {
         messages: [new HumanMessage(reminder.task)],
@@ -51,6 +56,8 @@ cron.schedule("* * * * *", async () => {
       scheduledAt: { $lte: now },
     });
 
+    log("POLL", `Checked for due one-time tasks at ${now.toISOString()}`);
+    
     if (dueTasks.length === 0) return;
 
     log("POLL", `Found ${dueTasks.length} due one-time task(s)`);
