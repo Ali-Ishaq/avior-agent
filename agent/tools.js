@@ -29,7 +29,11 @@ export const gmailTool = tool(
 
     const tokenResult = await getAccessToken(phone);
     if (tokenResult.status === "failed")
-      return fail("send_gmail", tokenResult.message);
+      return fail(
+        "send_gmail",
+        tokenResult.message,
+        "Ask the user to open the AUTH_REQUIRED link to connect Google.",
+      );
 
     const { accessToken, refreshToken } = tokenResult.tokens;
 
@@ -100,7 +104,11 @@ export const addCalendarEvent = tool(
 
     const tokenResult = await getAccessToken(phone);
     if (tokenResult.status === "failed")
-      return fail("add_calendar_event", tokenResult.message);
+      return fail(
+        "add_calendar_event",
+        tokenResult.message,
+        "Ask the user to open the AUTH_REQUIRED link to connect Google.",
+      );
 
     const { accessToken, refreshToken } = tokenResult.tokens;
 
@@ -182,7 +190,11 @@ export const scheduleMeet = tool(
 
     const tokenResult = await getAccessToken(phone);
     if (tokenResult.status === "failed")
-      return fail("schedule_meet", tokenResult.message);
+      return fail(
+        "schedule_meet",
+        tokenResult.message,
+        "Ask the user to open the AUTH_REQUIRED link to connect Google.",
+      );
 
     // Guard: reject past dates
     const eventStart = new Date(`${date}T${startTime}:00`);
@@ -289,7 +301,11 @@ export const checkAvailability = tool(
 
     const tokenResult = await getAccessToken(phone);
     if (tokenResult.status === "failed")
-      return fail("check_availability", tokenResult.message);
+      return fail(
+        "check_availability",
+        tokenResult.message,
+        "Ask the user to open the AUTH_REQUIRED link to connect Google.",
+      );
 
     const { accessToken, refreshToken } = tokenResult.tokens;
     const auth = oauth2Client;
@@ -396,7 +412,11 @@ const getSchedule = tool(
 
     const tokenResult = await getAccessToken(phone);
     if (tokenResult.status === "failed")
-      return fail("get_schedule", tokenResult.message);
+      return fail(
+        "get_schedule",
+        tokenResult.message,
+        "Ask the user to open the AUTH_REQUIRED link to connect Google.",
+      );
 
     const { accessToken, refreshToken } = tokenResult.tokens;
     const auth = oauth2Client;
@@ -521,7 +541,7 @@ const getAccessToken = async (phone) => {
 };
 
 export const createAutomatedTask = tool(
-  async ({ task, type, scheduledAt, cronExpr }, config) => {
+  async ({ task, type, scheduledAt, cronExpr, requiresGoogle }, config) => {
     const phone = config?.configurable?.phoneNumber;
     const waMessageId = config?.configurable?.waMessageId;
     if (!phone)
@@ -554,6 +574,18 @@ export const createAutomatedTask = tool(
       );
     }
 
+    // Check Google access if task requires it
+    if (requiresGoogle) {
+      const tokenResult = await getAccessToken(phone);
+      if (tokenResult.status === "failed") {
+        return fail(
+          "create_automated_task",
+          tokenResult.message,
+          "Ask the user to open the AUTH_REQUIRED link to connect Google, then retry creating the task.",
+        );
+      }
+    }
+
     try {
       const reminder = await ScheduledJob.create({
         phoneNumber: phone,
@@ -583,22 +615,35 @@ export const createAutomatedTask = tool(
   {
     name: "create_automated_task",
     description: `Schedules a one-time or recurring task for the agent to execute automatically at the given time.
-      The agent will invoke itself at the scheduled time and carry out the task using its available tools.The task will be passed as a direct instruction to the agent.
-      Write it as a command the agent should act on, not a conversational response.
- 
+      The agent will invoke itself at the scheduled time and carry out the task using its available tools.
+      The task will be passed as a direct instruction to the agent — write it as a command to act on, not a conversational response.
+
       Use for things like:
-      - "Remind me to pick Ali in 20 minutes" → one-time, task: "Send me a response message: time to pick Ali"
-      - "Email me the weather every morning at 8am" → recurring, task: "Search today's weather in Karachi and email it to me"
-      - "Remind me to send the report on Friday at 5pm" → one-time, task: "Send me a response message: don't forget to send the report"
- 
+      - "Remind me to pick Ali in 20 minutes"      → once,      task: "Tell the user: time to pick Ali"
+      - "Send me a joke every day at noon"          → recurring, task: "generate a programming joke and tell it to the user"
+      - "Email me the weather every morning at 8am" → recurring, task: "Search today's weather in Karachi and email it to me at <email>"
+      - "Remind me to send the report on Friday"    → once,      task: "Tell the user: don't forget to send the report"
+
       CRITICAL — TASK COMPLETENESS:
       Before calling this tool, mentally simulate running the task with zero user input.
-      The task field must contain every piece of information needed to complete it.
+      Identify every tool the task will need and ensure all required fields are embedded in the task string.
 
-      Go through each tool the task will need and ensure all its required fields are embedded:
+      - Needs send_gmail?        → embed full recipient email, subject, and complete body
+      - Needs schedule_meet?     → embed full attendee email(s), exact date, start and end time
+      - Needs add_calendar_event → embed title, exact date, start and end time
+      - Needs web_search result? → embed exactly what to search and where/how to deliver the result
+      - Sending a message back?  → write as "Tell the user: <message>" — no tool needed
 
       If ANY required detail is missing — ask the user for it BEFORE calling this tool.
-      Never call this tool with a vague or incomplete task.
+      Never store a vague or incomplete task.
+
+      GOOGLE ACCESS:
+      Set requiresGoogle: true if the task will use any of:
+      send_gmail, add_calendar_event, schedule_meet, check_availability, get_schedule.
+      The tool will verify Google is connected and return AUTH_REQUIRED if not.
+      Keep CURRENT_TASK intact and wait for the user to authorize, then retry.
+
+      SCHEDULING:
       - Never guess or infer a cronExpr — always confirm the exact schedule with the user first.
       - scheduledAt must be in ISO 8601 UTC format.`,
     schema: z.object({
@@ -610,19 +655,24 @@ export const createAutomatedTask = tool(
       type: z
         .enum(["once", "recurring"])
         .describe(
-          "once for a single future task, recurring for a repeating schedule",
+          "once for a single future task, recurring for a repeating schedule.",
+        ),
+      requiresGoogle: z
+        .boolean()
+        .describe(
+          "Set true if the task will use send_gmail, add_calendar_event, schedule_meet, check_availability, or get_schedule. The tool will verify Google is connected before saving.",
         ),
       scheduledAt: z
         .string()
         .optional()
         .describe(
-          "Required for one-time reminders. ISO 8601 UTC e.g. 2026-06-01T07:00:00Z",
+          "Required for one-time tasks. ISO 8601 UTC e.g. 2026-06-01T07:00:00Z",
         ),
       cronExpr: z
         .string()
         .optional()
         .describe(
-          "Required for recurring reminders. Standard 5-field cron expression e.g. '0 12 * * *' for daily at noon, '0 9 * * 1' for every Monday at 9am",
+          "Required for recurring tasks. Standard 5-field cron expression e.g. '0 12 * * *' for daily at noon, '0 9 * * 1' for every Monday at 9am.",
         ),
     }),
   },
