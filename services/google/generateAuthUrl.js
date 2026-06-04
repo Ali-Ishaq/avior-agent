@@ -13,6 +13,8 @@ export function generateAuthUrl(phoneNumber) {
     scope: [
       "https://www.googleapis.com/auth/gmail.modify",
       "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/userinfo.email", 
+      "https://www.googleapis.com/auth/userinfo.profile",
     ],
     state: phoneNumber, // returned as-is in callback
   });

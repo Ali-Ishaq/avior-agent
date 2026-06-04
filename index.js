@@ -9,12 +9,14 @@ import { authRouter } from "./routes/auth.js";
 
 import { connectDB } from "./config/db.js";
 import {startCronRunner} from "./agent/cronRunner.js";
+import { webhookRouter } from "./routes/webhooks.js";
 
 const app = express();
 app.use(express.json());
 
-app.get("/webhook", handleWhatsAppWebhookVerify);
-app.post("/webhook", handleWhatsAppWebhookMessage);
+// app.get("/webhook", handleWhatsAppWebhookVerify);
+// app.post("/webhook", handleWhatsAppWebhookMessage);
+app.use("/webhook", webhookRouter);
 
 app.get("/", (req, res) => {
   res.send("Hello from Avior Agent!");

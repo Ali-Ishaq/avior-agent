@@ -3,10 +3,15 @@ import mongoose from "mongoose";
 
 const userTokenSchema = new mongoose.Schema(
   {
+
     phoneNumber: {
       type: String,
       required: true,
       unique: true,
+    },
+    emailAddress: {
+      type: String,
+      required: true,
     },
     google: {
       accessToken: {
@@ -17,6 +22,9 @@ const userTokenSchema = new mongoose.Schema(
         type: String,
         required: true,
       },
+
+      historyId: { type: String },
+      watchExpiry: { type: Date },
       expiryDate: {
         type: Date, // store expiry so you know when to refresh
         required: true,

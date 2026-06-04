@@ -1,7 +1,9 @@
 import "../config/loadEnv.js";
+import { google } from "googleapis";
 import { sendMessage } from "../services/index.js";
 import { oauth2Client } from "../services/google/generateAuthUrl.js";
 import { UserToken } from "../model/userToken.js";
+import { registerGmailWatch } from "../services/google/gmail.js";
 
 export const googleAuthHandler = async (req, res) => {
   const { code, state: phoneNumber, error } = req.query;
@@ -17,24 +19,55 @@ export const googleAuthHandler = async (req, res) => {
   try {
     const { tokens: rawTokens } = await oauth2Client.getToken(code);
 
+    oauth2Client.setCredentials(rawTokens);
+
+    const oauth2 = google.oauth2({
+      auth: oauth2Client,
+      version: "v2",
+    });
+
     const googleTokens = {
       accessToken: rawTokens.access_token,
       refreshToken: rawTokens.refresh_token,
       expiryDate: rawTokens.expiry_date,
     };
 
+    const {
+      data: { email: emailAddress },
+    } = await oauth2.userinfo.get();
+
     const userTokens = await UserToken.findOneAndUpdate(
       { phoneNumber },
-      { google: googleTokens },
-      { upsert: true, returnDocument: "after" },
+      {
+        $set: {
+          emailAddress: emailAddress,
+          google: googleTokens,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        runValidators: true,
+      },
     );
-    // tokens.save(phoneNumber, rawTokens);
-    console.log("Stored tokens for", phoneNumber, userTokens.google);
+
+    try {
+      await registerGmailWatch(emailAddress, rawTokens);
+    } catch (err) {
+      console.error("Status:", err.status);
+      console.error("Message:", err.message);
+      console.error("Errors:", JSON.stringify(err.errors, null, 2));
+      console.error(
+        "Response data:",
+        JSON.stringify(err.response?.data, null, 2),
+      );
+    }
+
     await sendMessage(
       phoneNumber,
-      "✅ Gmail connected! You can now ask me to send emails.",
+      "✅ Your Google account is connected! You can now ask me to do google related tasks.",
     );
-    res.send("<h3>✅ Gmail Connected! You can close this tab.</h3>");
+    res.send("<h3>✅ Google Account Connected! You can close this tab.</h3>");
   } catch (err) {
     console.error("OAuth callback error:", err.message);
     await sendMessage(
