@@ -1,7 +1,7 @@
 import "../config/loadEnv.js";
 import { google } from "googleapis";
 import { sendMessage } from "../services/index.js";
-import { oauth2Client } from "../services/google/generateAuthUrl.js";
+import { createAuthClient } from "../services/google/generateAuthUrl.js";
 import { UserToken } from "../model/userToken.js";
 import { registerGmailWatch } from "../services/google/gmail.js";
 
@@ -17,12 +17,13 @@ export const googleAuthHandler = async (req, res) => {
   }
 
   try {
-    const { tokens: rawTokens } = await oauth2Client.getToken(code);
+    const auth = createAuthClient();
+    const { tokens: rawTokens } = await auth.getToken(code);
 
-    oauth2Client.setCredentials(rawTokens);
+    auth.setCredentials(rawTokens);
 
     const oauth2 = google.oauth2({
-      auth: oauth2Client,
+      auth,
       version: "v2",
     });
 

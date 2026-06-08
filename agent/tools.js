@@ -3,9 +3,8 @@ import { z } from "zod";
 import { TavilySearch } from "@langchain/tavily";
 import { google } from "googleapis";
 
-import { isTokenExpired } from "../services/google/isTokenExpired.js";
 import {
-  oauth2Client,
+  createAuthClient,
   generateAuthUrl,
 } from "../services/google/generateAuthUrl.js";
 import { UserToken } from "../model/userToken.js";
@@ -35,13 +34,9 @@ export const gmailTool = tool(
         "Ask the user to open the AUTH_REQUIRED link to connect Google.",
       );
 
-    const { accessToken, refreshToken } = tokenResult.tokens;
+    const { refreshToken } = tokenResult;
 
-    const auth = oauth2Client;
-    auth.setCredentials({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const auth = createAuthClient(refreshToken);
     const gmail = google.gmail({ version: "v1", auth });
 
     const raw = Buffer.from(
@@ -110,13 +105,9 @@ export const addCalendarEvent = tool(
         "Ask the user to open the AUTH_REQUIRED link to connect Google.",
       );
 
-    const { accessToken, refreshToken } = tokenResult.tokens;
+    const { refreshToken } = tokenResult;
 
-    const auth = oauth2Client;
-    auth.setCredentials({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const auth = createAuthClient(refreshToken);
     const calendar = google.calendar({ version: "v3", auth });
 
     try {
@@ -206,12 +197,8 @@ export const scheduleMeet = tool(
       );
     }
 
-    const { accessToken, refreshToken } = tokenResult.tokens;
-    const auth = oauth2Client;
-    auth.setCredentials({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const { refreshToken } = tokenResult;
+    const auth = createAuthClient(refreshToken);
     const calendar = google.calendar({ version: "v3", auth });
 
     try {
@@ -307,12 +294,8 @@ export const checkAvailability = tool(
         "Ask the user to open the AUTH_REQUIRED link to connect Google.",
       );
 
-    const { accessToken, refreshToken } = tokenResult.tokens;
-    const auth = oauth2Client;
-    auth.setCredentials({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const { refreshToken } = tokenResult;
+    const auth = createAuthClient(refreshToken);
     const calendar = google.calendar({ version: "v3", auth });
 
     try {
@@ -418,12 +401,8 @@ const getSchedule = tool(
         "Ask the user to open the AUTH_REQUIRED link to connect Google.",
       );
 
-    const { accessToken, refreshToken } = tokenResult.tokens;
-    const auth = oauth2Client;
-    auth.setCredentials({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const { refreshToken } = tokenResult;
+    const auth = createAuthClient(refreshToken);
     const calendar = google.calendar({ version: "v3", auth });
 
     try {
@@ -497,46 +476,12 @@ const getAccessToken = async (phone) => {
   const userTokenDoc = await UserToken.findOne({ phoneNumber: phone });
   if (!userTokenDoc) {
     const authUrl = generateAuthUrl(phone);
-
-    return {
-      status: "failed",
-      message: `AUTH_REQUIRED: ${authUrl}`,
-    };
-  }
-
-  let tokens = userTokenDoc.google;
-
-  if (isTokenExpired(tokens.expiryDate)) {
-    console.log(`Access token for ${phone} is expired. Refreshing...`);
-    try {
-      oauth2Client.setCredentials({ refresh_token: tokens.refreshToken });
-      const { credentials } = await oauth2Client.refreshAccessToken();
-
-      const updated = await UserToken.findOneAndUpdate(
-        { phoneNumber: phone },
-        {
-          google: {
-            accessToken: credentials.access_token,
-            refreshToken: credentials.refresh_token || tokens.refreshToken, // keep old refresh token if new one isn't provided
-            expiryDate: credentials.expiry_date,
-          },
-        },
-        { new: true },
-      );
-      tokens = updated.google;
-      console.log(`Access token refreshed for ${phone}`);
-    } catch (error) {
-      console.error(`Failed to refresh token for ${phone}:`, error);
-      return {
-        status: "failed",
-        message: `Token refresh failed for ${phone}: ${error.message}`,
-      };
-    }
+    return { status: "failed", message: `AUTH_REQUIRED: ${authUrl}` };
   }
 
   return {
     status: "success",
-    tokens: tokens,
+    refreshToken: userTokenDoc.google.refreshToken,
   };
 };
 

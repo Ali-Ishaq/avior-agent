@@ -1,12 +1,11 @@
 import { UserToken } from "../../model/userToken.js";
-import { oauth2Client } from "./generateAuthUrl.js";
+import { createAuthClient } from "./generateAuthUrl.js";
 import { google } from "googleapis";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 
 export const registerGmailWatch = async (emailAddress, tokens) => {
-  const auth = oauth2Client;
-  auth.setCredentials(tokens);
+  const auth = createAuthClient(tokens);
   const gmail = google.gmail({ version: "v1", auth });
   const res = await gmail.users.watch({
     userId: "me",

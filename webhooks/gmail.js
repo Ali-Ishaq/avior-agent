@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import { UserToken } from "../model/userToken.js";
 import { sendMessage } from "../services/index.js";
-import { oauth2Client } from "../services/google/generateAuthUrl.js";
+import { createAuthClient } from "../services/google/generateAuthUrl.js";
 import { summarizeEmail } from "../services/google/gmail.js";
 
 export const handleGmailPubSubWebhook = async (req, res) => {
@@ -21,8 +21,7 @@ export const handleGmailPubSubWebhook = async (req, res) => {
     if (!tokens) return;
 
     console.log(`Processing Gmail update for ${emailAddress} (historyId: ${newHistoryId})`);
-    const auth = oauth2Client;
-    auth.setCredentials({
+    const auth = createAuthClient({
       access_token: tokens.google.accessToken,
       refresh_token: tokens.google.refreshToken,
     });

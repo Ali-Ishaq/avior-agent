@@ -35,8 +35,7 @@ export const startGmailWatchRefreshCron = () => {
     let ok = 0;
     let failed = 0;
 
-    // IMPORTANT: registerWatch uses a shared oauth2Client singleton.
-    // Run sequentially to avoid credentials races.
+    // Run sequentially
     for (const user of users) {
       try {
         await registerGmailWatch(user.emailAddress, buildRawTokenShape(user));
