@@ -2,7 +2,7 @@ import { google } from "googleapis";
 import { UserToken } from "../../model/userToken.js";
 
 export const createAuthClient = (refreshToken) => {
-  const auth = new OAuth2Client(
+  const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     process.env.GOOGLE_REDIRECT_URI
