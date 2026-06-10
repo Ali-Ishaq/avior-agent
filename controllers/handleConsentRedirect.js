@@ -1,4 +1,4 @@
-import { generateAuthUrl } from "../services/google/generateAuthUrl";
+import { generateAuthUrl } from "../services/google/generateAuthUrl.js";
 
 export const handleConsentRedirect = (req, res) => {
   const { state } = req.query;
