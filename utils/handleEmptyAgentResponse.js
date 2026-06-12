@@ -4,8 +4,9 @@
 // agent with a nudge, and falls back to a user-friendly error message if all attempts fail.
 
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
+import { agent } from "../agent/index.js";
 
-export const handleEmptyAgentResponse = async (agent, response, config) => {
+export const handleEmptyAgentResponse = async (response, config) => {
   const MAX_ATTEMPTS = 3;
   let attempt = 0;
 

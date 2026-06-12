@@ -8,18 +8,16 @@ import {
 import { authRouter } from "./routes/auth.js";
 
 import { connectDB } from "./config/db.js";
-import {startCronRunner} from "./agent/cronRunner.js";
+import { startCronRunner } from "./agent/cronRunner.js";
 import { webhookRouter } from "./routes/webhooks.js";
 import { handleConsentRedirect } from "./controllers/handleConsentRedirect.js";
 
 const app = express();
 app.use(express.json());
 
-// app.get("/webhook", handleWhatsAppWebhookVerify);
-// app.post("/webhook", handleWhatsAppWebhookMessage);
 app.use("/webhook", webhookRouter);
 
-app.get("/connect",handleConsentRedirect)
+app.get("/connect", handleConsentRedirect);
 
 app.get("/", (req, res) => {
   res.send("Hello from Avior Agent!");
@@ -31,12 +29,11 @@ const startServer = async () => {
   try {
     await connectDB(); // wait for DB before doing anything
     await startCronRunner(); // start cron runner after DB is connected
-    
 
     const server = app.listen(process.env.PORT || 3000, () => {
       console.log(`Server running on port ${process.env.PORT || 3000}`);
     });
-
+    
     // Handle server-level errors (e.g. port already in use)
     server.on("error", (err) => {
       console.error("Server error:", err.message);
