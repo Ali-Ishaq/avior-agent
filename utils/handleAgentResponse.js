@@ -23,8 +23,13 @@ export const handleAgentResponse = async (agentResponse, config) => {
     const lastToolMessage = JSON.parse(
       [...agentResponse.messages]
         .reverse()
-        .find((m) => m.id.includes("ToolMessage")).kwargs.content,
+        .find(
+          (m) =>
+            m.constructor?.name === "ToolMessage" ||
+            m.id?.includes?.("ToolMessage"),
+        )?.content,
     );
+
     if (
       lastToolMessage &&
       lastToolMessage.status === "error" &&
@@ -32,30 +37,30 @@ export const handleAgentResponse = async (agentResponse, config) => {
     ) {
       let authUrl = lastToolMessage.reason.split("AUTH_REQUIRED: ")[1].trim();
       await sendTemplateMessage(
-        config.phoneNumber,
+        config.configurable.phoneNumber,
         "account_authorization ",
         [
           [
             "https://res.cloudinary.com/drwizlf0y/image/upload/v1781123070/Google_Favicon_2025_a7dsia.png",
           ],
           ["this task"],
-          [config.phoneNumber],
+          [config.configurable.phoneNumber],
         ],
-        config.waMessageId,
+        config.configurable.waMessageId,
       );
     } else {
       await sendMessage(
-        config.phoneNumber,
+        config.configurable.phoneNumber,
         agentResponse.messages.at(-1).content,
-        config.waMessageId,
+        config.configurable.waMessageId,
       );
     }
   } catch (error) {
     console.error("Error handling agent response:", error.message);
     await sendMessage(
-      config.phoneNumber,
+      config.configurable.phoneNumber,
       "⚠️ Unable to process the response at the moment. Please try again.",
-      config.waMessageId,
+      config.configurable.waMessageId,
     );
   }
 };
