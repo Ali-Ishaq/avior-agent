@@ -1,7 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
 import { agent, getConfig } from "../agent/index.js";
-import { sendMessage } from "../services/index.js";
-import { sendTemplateMessage } from "../services/whatsapp/sendMessage.js";
 import { handleAgentResponse } from "../utils/handleAgentResponse.js";
 
 export const handleWhatsAppWebhookVerify = (req, res) => {
@@ -14,29 +12,32 @@ export const handleWhatsAppWebhookVerify = (req, res) => {
 };
 
 export const handleWhatsAppWebhookMessage = async (req, res) => {
-  console.log(
-    "Received webhook message:",
-    req.body.entry[0]?.changes[0]?.value.messages[0]?.text?.body ||
-      "No message text found",
-  );
+  const value = req.body.entry?.[0]?.changes?.[0]?.value;
+  const msg = value?.messages?.[0];
+
+  if (!msg) return;
+
+  const messageContent = msg.text?.body || msg.button?.payload || null;
+
+  if (!messageContent) return;
+
+  console.log("Received webhook message:", messageContent);
+
   res.status(200).send("Message received");
-  const {
-    from,
-    id: messageId,
-    text: { body: message },
-  } = req.body.entry[0].changes[0].value.messages[0];
+  const { from, id: messageId } = msg;
 
   const config = getConfig({
     thread_id: from,
     phoneNumber: from,
     waMessageId: messageId,
   });
+
   let agentResponse = await agent.invoke(
     {
-      messages: [new HumanMessage(message)],
+      messages: [new HumanMessage(messageContent)],
     },
     config,
   );
 
-   await handleAgentResponse(agentResponse, config);
+  await handleAgentResponse(agentResponse, config);
 };
