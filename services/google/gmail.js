@@ -3,7 +3,6 @@ import { createAuthClient } from "./generateAuthUrl.js";
 import { google } from "googleapis";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
-
 export const registerGmailWatch = async (emailAddress, tokens) => {
   const auth = createAuthClient(tokens);
   const gmail = google.gmail({ version: "v1", auth });
@@ -34,10 +33,8 @@ export const fetchEmailContent = async (messageId, auth) => {
   });
 
   const headers = msg.data.payload?.headers ?? [];
-
   const get = (name) => headers.find((h) => h.name === name)?.value ?? "";
 
-  // Extract plain text body
   let body = "";
   const parts = msg.data.payload?.parts ?? [];
 
@@ -48,11 +45,10 @@ export const fetchEmailContent = async (messageId, auth) => {
     }
   }
 
-  // Fallback: simple email (no multipart)
   if (!body && msg.data.payload?.body?.data) {
     body = Buffer.from(msg.data.payload.body.data, "base64").toString("utf-8");
   }
-
+  
   return {
     subject: get("Subject"),
     from: get("From"),
@@ -68,21 +64,18 @@ export const summarizeEmail = async (messageId, auth) => {
 
   const email = await fetchEmailContent(messageId, auth);
 
-  // Single-shot summarization
   const response = await model.invoke([
     {
       role: "system",
-      content: `You are a personal email assistant. Summarize emails concisely for WhatsApp.
-Format your response exactly like this:
-👤 *From:* <sender>
-
-📌 *Subject:* <subject>
-
-📝 *Summary:* <2-3 sentence summary>
-
-⚡ *Action needed:* <yes/no and what, or "None">
-
-🔴🟡🟢 *Priority:* <High/Medium/Low>`,
+      content: `You are a personal email assistant. Summarize emails concisely.
+Respond ONLY with a valid JSON object — no markdown, no code fences, no extra text.
+The JSON must have exactly these keys:
+{
+  "from": "<sender>",
+  "subject": "<subject>",
+  "summary": "<2-3 sentence summary>",
+  "priority": "<High | Medium | Low>"
+}`,
     },
     {
       role: "user",
@@ -93,5 +86,10 @@ ${email.body}`,
     },
   ]);
 
-  return response.content;
+  const parsed = JSON.parse(response.content);
+
+  return {
+    ...parsed,
+    messageId,
+  };
 };

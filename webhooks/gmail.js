@@ -1,6 +1,9 @@
 import { google } from "googleapis";
 import { UserToken } from "../model/userToken.js";
-import { sendMessage } from "../services/index.js";
+import {
+  sendMessage,
+  sendTemplateMessage,
+} from "../services/whatsapp/sendMessage.js";
 import { createAuthClient } from "../services/google/generateAuthUrl.js";
 import { summarizeEmail } from "../services/google/gmail.js";
 
@@ -20,7 +23,9 @@ export const handleGmailPubSubWebhook = async (req, res) => {
     const tokens = await UserToken.findOne({ emailAddress });
     if (!tokens) return;
 
-    console.log(`Processing Gmail update for ${emailAddress} (historyId: ${newHistoryId})`);
+    console.log(
+      `Processing Gmail update for ${emailAddress} (historyId: ${newHistoryId})`,
+    );
     const auth = createAuthClient({
       access_token: tokens.google.accessToken,
       refresh_token: tokens.google.refreshToken,
@@ -50,8 +55,14 @@ export const handleGmailPubSubWebhook = async (req, res) => {
 
     for (const messageId of newMessageIds) {
       try {
-        const summary = await summarizeEmail(messageId, auth);
-        await sendMessage(tokens.phoneNumber, summary);
+        const { from, subject, summary, priority, messageId } =
+          await summarizeEmail(messageId, auth);
+        await sendTemplateMessage(tokens.phoneNumber, "email_summary_card", [
+          [], 
+          [from, subject, summary, priority],
+          [messageId],
+        ]);
+        // await sendMessage(tokens.phoneNumber, summary);
       } catch (err) {
         console.error(`Failed to process ${messageId}:`, err);
       }
@@ -62,9 +73,6 @@ export const handleGmailPubSubWebhook = async (req, res) => {
       { "google.historyId": newHistoryId },
     );
   } catch (err) {
-   
     console.error("Webhook error:", err);
   }
 };
-
-
