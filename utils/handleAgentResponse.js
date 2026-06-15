@@ -20,13 +20,12 @@ export const handleAgentResponse = async (agentResponse, config) => {
     }
 
     // Find the last ToolMessage in the entire messages array
-    const toolMsg = [...agentResponse.messages]
-      .reverse()
-      .find((m) => m.tool_call_id !== undefined);
+    const toolMsg = [...agentResponse.messages].at(-2);
 
-    const lastToolMessage = toolMsg?.content
-      ? JSON.parse(toolMsg.content)
-      : null;
+    const lastToolMessage =
+      toolMsg?.constructor?.name === "ToolMessage" && toolMsg?.content
+        ? JSON.parse(toolMsg.content)
+        : null;
 
     if (
       lastToolMessage &&
