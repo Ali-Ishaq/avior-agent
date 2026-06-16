@@ -53,7 +53,7 @@ export const googleAuthHandler = async (req, res) => {
     );
 
     try {
-      await registerGmailWatch(emailAddress, rawTokens);
+      await registerGmailWatch(emailAddress, rawTokens.refresh_token);
     } catch (err) {
       console.error("Status:", err.status);
       console.error("Message:", err.message);
