@@ -5,7 +5,7 @@ export const createAuthClient = (refreshToken) => {
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    process.env.GOOGLE_REDIRECT_URI,
   );
   auth.setCredentials({ refresh_token: refreshToken });
   return auth;
@@ -24,3 +24,7 @@ export function generateAuthUrl(phoneNumber) {
     state: phoneNumber, // returned as-is in callback
   });
 }
+
+export const generateGmailUrl = (messageId) => {
+  return `https://mail.google.com/mail/u/0/#inbox/${messageId}`;
+};

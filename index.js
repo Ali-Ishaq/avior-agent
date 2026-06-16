@@ -10,13 +10,14 @@ import { authRouter } from "./routes/auth.js";
 import { connectDB } from "./config/db.js";
 import { startCronRunner } from "./agent/cronRunner.js";
 import { webhookRouter } from "./routes/webhooks.js";
-import { handleConsentRedirect } from "./controllers/handleConsentRedirect.js";
+import {redirectRouter} from "./routes/redirect.js";
+import { handleConsentRedirect } from "./controllers/redirect.js";
 
 const app = express();
 app.use(express.json());
 
 app.use("/webhook", webhookRouter);
-
+app.use("/redirect", redirectRouter);
 app.get("/connect", handleConsentRedirect);
 
 app.get("/", (req, res) => {
