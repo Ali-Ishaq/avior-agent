@@ -26,10 +26,7 @@ export const handleGmailPubSubWebhook = async (req, res) => {
     console.log(
       `Processing Gmail update for ${emailAddress} (historyId: ${newHistoryId})`,
     );
-    const auth = createAuthClient({
-      access_token: tokens.google.accessToken,
-      refresh_token: tokens.google.refreshToken,
-    });
+    const auth = createAuthClient(tokens.google.refreshToken);
 
     const gmail = google.gmail({ version: "v1", auth });
 
@@ -58,7 +55,7 @@ export const handleGmailPubSubWebhook = async (req, res) => {
         const { from, subject, summary, priority, messageId } =
           await summarizeEmail(messageId, auth);
         await sendTemplateMessage(tokens.phoneNumber, "email_summary_card", [
-          [], 
+          [],
           [from, subject, summary, priority],
           [messageId],
         ]);
