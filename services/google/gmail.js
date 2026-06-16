@@ -48,7 +48,7 @@ export const fetchEmailContent = async (messageId, auth) => {
   if (!body && msg.data.payload?.body?.data) {
     body = Buffer.from(msg.data.payload.body.data, "base64").toString("utf-8");
   }
-  
+
   return {
     subject: get("Subject"),
     from: get("From"),
@@ -88,8 +88,5 @@ ${email.body}`,
 
   const parsed = JSON.parse(response.content);
 
-  return {
-    ...parsed,
-    messageId,
-  };
+  return parsed;
 };

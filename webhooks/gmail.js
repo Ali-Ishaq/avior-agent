@@ -52,14 +52,17 @@ export const handleGmailPubSubWebhook = async (req, res) => {
 
     for (const messageId of newMessageIds) {
       try {
-        const { from, subject, summary, priority, messageId } =
-          await summarizeEmail(messageId, auth);
+        const {
+          from,
+          subject,
+          summary,
+          priority,
+        } = await summarizeEmail(messageId, auth);
         await sendTemplateMessage(tokens.phoneNumber, "email_summary_card", [
           [],
           [from, subject, summary, priority],
           [messageId],
         ]);
-        // await sendMessage(tokens.phoneNumber, summary);
       } catch (err) {
         console.error(`Failed to process ${messageId}:`, err);
       }
